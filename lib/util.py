@@ -1,3 +1,5 @@
+from email.header import Header
+
 import pandas as pd
 
 def extract_top_stocks(number_of_stocks = 1000):
@@ -12,4 +14,16 @@ def extract_top_stocks(number_of_stocks = 1000):
 
     return top_symbols
 
-print(extract_top_stocks())
+
+def get_cik_list_from_tickers(tickers):
+    ciksDF = pd.read_csv('../data/sym_to_cik.csv', header=None)
+    ciksDF = ciksDF.set_index(0)
+    cik_list = []
+    for ticker in tickers:
+        try:
+            cik_list.append(int(ciksDF.loc[ticker.lower(), 1]))
+        except:
+            print("CIK not found for {}".format(ticker))
+    return cik_list
+
+print(get_cik_list_from_tickers(extract_top_stocks()))
