@@ -1,29 +1,45 @@
-from email.header import Header
+import os
 
+from sec_edgar_downloader import Downloader
+import requests
 import pandas as pd
 
-def extract_top_stocks(number_of_stocks = 1000):
-    file_path = '../data/stocks_data.csv'  # Update this path
-    data = pd.read_csv(file_path)
+FILING_TYPE = '10-K'
+BASE_DIR = 'Mirae_10_K_Filings'
 
-    data['Market Cap'] = pd.to_numeric(data['Market Cap'], errors='coerce')
+def download_cik_list():
+    headers = {'User-Agent': "x24manans@iima.ac.in"}
 
-    top_stocks = data.sort_values(by='Market Cap', ascending=False).head(number_of_stocks)
+    # get all companies data
+    company_tickers = requests.get(
+        "https://www.sec.gov/files/company_tickers.json",
+        headers=headers
+    )
 
-    top_symbols = top_stocks['Symbol'].tolist()
+    companyData = pd.DataFrame.from_dict(company_tickers.json(),
+                                         orient='index')
 
-    return top_symbols
+    # add leading zeros to CIK
+    companyData['cik_str'] = companyData['cik_str'].astype(
+        str).str.zfill(10)
+    cik_list = companyData.iloc[0:5, 0].tolist()
+    cik_title_list = companyData.iloc[0:5, -1].tolist()
+    return cik_list, cik_title_list
+
+def download_filing_data(cik_list, cik_title_list, filing_type, base_dir = BASE_DIR, years=1):
+    for c, c_title in zip(cik_list, cik_title_list):
+        download_path = os.path.join(base_dir, c_title)  # Create a unique directory for each title
+        downloader = Downloader('Manan','x24manans@iima.ac.in',download_path)
+        downloader.get(filing_type, c, limit=years, download_details=False)
+        print(f"Downloaded filings for {c_title} at {download_path}")
 
 
-def get_cik_list_from_tickers(tickers):
-    ciksDF = pd.read_csv('../data/sym_to_cik.csv', header=None)
-    ciksDF = ciksDF.set_index(0)
-    cik_list = []
-    for ticker in tickers:
-        try:
-            cik_list.append(int(ciksDF.loc[ticker.lower(), 1]))
-        except:
-            print("CIK not found for {}".format(ticker))
-    return cik_list
+def get_all_filing_paths():
+    result = []
 
-print(get_cik_list_from_tickers(extract_top_stocks()))
+    for path, dirs, files in os.walk(BASE_DIR):
+        for name in files:
+            if name.lower().endswith(".txt"):
+                result.append(os.path.join(path, name))
+
+    return result
